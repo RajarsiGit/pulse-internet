@@ -75,6 +75,10 @@ If your host applies a Content Security Policy, allow `connect-src https://speed
 - Explicit partial results and retry guidance after cancellation or failure. Never substitutes generated values.
 - Optional WebMCP tool integration so an AI agent running in a supporting browser can read displayed results or trigger a real test on the visitor's behalf.
 
+### Global reach
+
+A small "Global reach" panel measures round-trip latency from the visitor's browser to fixed servers in eight world regions (N. Virginia, São Paulo, Frankfurt, Cape Town, Bahrain, Singapore, Tokyo, and Sydney), so you can see at a glance how the connection performs toward different parts of the world, not just toward the nearest edge used for the main speed test. It runs automatically alongside the rest of the page and reports each region independently — a region that doesn't respond in time shows as "Unreachable" rather than blocking the others. See `GLOBAL_LOCATIONS` and `checkGlobalLatency` in `src/network.js`.
+
 ## Design decisions worth knowing
 
 - **No backend, no proxy.** Requests go straight from the browser to Cloudflare. Proxying through a server or serverless function would change the network path being measured and understate real-world latency.

@@ -40,6 +40,14 @@ This is intentionally a two-file architecture: `network.js` has zero React/DOM d
 - `validate()` is the only place that decides whether an HTTP response is usable (checks `ok`, redirects, and HTML content-type as a captive-portal signal). Route new failure detection through it rather than adding ad hoc checks elsewhere.
 - Errors thrown from this module should be human-readable; `friendlyError()` in `App.jsx`'s call path is the last line of defense but individual `Error` messages here are shown directly to users, so write them for a non-technical reader.
 
+## Global reach feature
+
+`GLOBAL_LOCATIONS` and `checkGlobalLatency`/`pingLocation` in `src/network.js` measure round-trip latency to fixed servers (AWS S3 regional endpoints) in eight world regions, rendered by the `GlobalReach` component in `App.jsx`. Notes:
+
+- Requests use `mode: 'no-cors'` deliberately — these endpoints don't grant CORS, and the goal is only to time the round trip via `performance.now()`, not to read the response body or status.
+- Per-location failures (timeout, network error) resolve to `latency: null` rather than throwing, so one unreachable region never blocks the others. Only cancelling the overall `signal` should throw.
+- If you add or change a location, keep the endpoint a real, fixed-geography server — this feature exists to show genuine measured latency by region, not decorative or simulated numbers (same "no silent success" principle as the main speed test).
+
 ## Working in `src/App.jsx`
 
 - `runSpeedTest` reports progress via an `onUpdate` callback, not a return value — the UI is driven by these incremental updates (gauge, phase rail, throughput chart), not just the final result. Preserve this streaming behavior; don't refactor it into a single awaited result.

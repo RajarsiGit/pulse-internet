@@ -22,6 +22,36 @@ function validate(response) {
   if (!response.ok) throw new Error(`The test server returned HTTP ${response.status}. Try again in a moment.`);
   if (response.redirected || response.headers.get('content-type')?.includes('text/html')) throw new Error('Your connection may require a sign-in, or the test endpoint is blocked.');
 }
+export const GLOBAL_LOCATIONS = [
+  { id: 'us-east', label: 'N. Virginia, US', url: 'https://s3.us-east-1.amazonaws.com' },
+  { id: 'sa-east', label: 'São Paulo, Brazil', url: 'https://s3.sa-east-1.amazonaws.com' },
+  { id: 'eu-central', label: 'Frankfurt, Germany', url: 'https://s3.eu-central-1.amazonaws.com' },
+  { id: 'af-south', label: 'Cape Town, South Africa', url: 'https://s3.af-south-1.amazonaws.com' },
+  { id: 'me-south', label: 'Bahrain', url: 'https://s3.me-south-1.amazonaws.com' },
+  { id: 'ap-southeast-1', label: 'Singapore', url: 'https://s3.ap-southeast-1.amazonaws.com' },
+  { id: 'ap-northeast-1', label: 'Tokyo, Japan', url: 'https://s3.ap-northeast-1.amazonaws.com' },
+  { id: 'ap-southeast-2', label: 'Sydney, Australia', url: 'https://s3.ap-southeast-2.amazonaws.com' },
+];
+export async function pingLocation(location, signal, timeout = 4000) {
+  checkAbort(signal);
+  const request = scope(signal, timeout), start = performance.now();
+  try {
+    await fetch(`${location.url}/?pulse=${nonce()}`, { signal: request.signal, mode: 'no-cors', cache: 'no-store', credentials: 'omit' });
+    return performance.now() - start;
+  } catch {
+    checkAbort(signal); // the whole check was cancelled, not just this location
+    return null; // unreachable or timed out; other locations still get a chance
+  } finally { request.close(); }
+}
+export async function checkGlobalLatency(signal, onUpdate) {
+  checkAbort(signal);
+  return Promise.all(GLOBAL_LOCATIONS.map(async location => {
+    const latency = await pingLocation(location, signal);
+    const entry = { ...location, latency };
+    onUpdate?.(entry);
+    return entry;
+  }));
+}
 export async function probe(signal, timeout = 5000) {
   checkAbort(signal);
   const request = scope(signal, timeout), start = performance.now();

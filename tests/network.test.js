@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { median, jitter, mbps, measureTransfer, probe, runSpeedTest } from '../src/network.js';
+import { median, jitter, mbps, measureTransfer, probe, runSpeedTest, checkGlobalLatency, GLOBAL_LOCATIONS } from '../src/network.js';
 
 test('unit conversions and latency statistics use real measured units', () => {
   assert.equal(mbps(1_000_000, 1000), 8);
@@ -66,6 +66,30 @@ test('a stalled endpoint times out instead of hanging indefinitely', async t => 
   }));
   await assert.rejects(probe(new AbortController().signal, 10), { name: 'TimeoutError' });
   await assert.rejects(measureTransfer('upload', new AbortController().signal, () => {}, { budget: 1000, duration: 10 }), /No upload sample completed/);
+});
+
+test('global latency check reports a duration for reachable locations and null for unreachable ones', async t => {
+  const seen = [];
+  t.mock.method(globalThis, 'fetch', async url => {
+    if (new URL(url).origin.includes('eu-central')) throw new TypeError('network error');
+    return new Response('', { status: 403 });
+  });
+  const results = await checkGlobalLatency(new AbortController().signal, entry => seen.push(entry.id));
+  assert.equal(results.length, GLOBAL_LOCATIONS.length);
+  assert.deepEqual(new Set(seen), new Set(GLOBAL_LOCATIONS.map(l => l.id)));
+  const eu = results.find(r => r.id === 'eu-central'), us = results.find(r => r.id === 'us-east');
+  assert.equal(eu.latency, null);
+  assert.ok(Number.isFinite(us.latency));
+});
+
+test('global latency check aborts every location when cancelled', async t => {
+  t.mock.method(globalThis, 'fetch', async (_url, { signal }) => new Promise((_resolve, reject) => {
+    signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+  }));
+  const controller = new AbortController();
+  const pending = checkGlobalLatency(controller.signal, () => {});
+  controller.abort();
+  await assert.rejects(pending, { name: 'AbortError' });
 });
 
 test('full test publishes all phases, finite results, and remains within payload caps', async t => {
